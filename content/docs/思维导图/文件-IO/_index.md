@@ -1,0 +1,549 @@
+---
+title: "文件 IO"
+type: "docs"
+weight: 250
+markmap: true
+xmindSource: "文件 IO.xmind"
+---
+
+```markmap
+---
+markmap:
+  initialExpandLevel: 2
+  spacingVertical: 30
+  spacingHorizontal: 180
+---
+
+# 文件 I/O
+- 文件和目录
+  - 所有打开的文件都通过文件描述符引用
+    - 文件描述符是一个非负整数
+    - 文件描述符 0 -&gt; 标准输入; 1 -&gt; 标准输出; 2 -&gt; 标准错误
+    - 文件描述符的范围是 0 ~ OPEN_MAX - 1
+  - stat、fstat、fstatat、和 lstat 函数 ![stat、fstat、fstatat、和 lstat 函数](images/e6f8637ce4cb3a63a43dff18668b167cfc65478f93a432cb7cc88589967c2b47.png)
+    - 一旦给出 pathname，stat 函数将返回与此命名文件有关的信息结构
+    - fstat 函数获得已在描述符 fd 上打开文件的有关信息
+    - lstat 函数类似于 stat，但是当命名的文件是一个符号链接时，lstat 返回该符号链接的有关信息，而不是由该符号链接引用的文件的信息
+    - fstatat 函数为一个相对于当前打开目录（由fd 参数指向）的路径名返回文件统计信息。
+      - flag 参数控制着是否跟随者一个符号链接。
+        - 当 AT_SYMLINK_NOFOLLOW 标志被设置时，不跟随，而是返回符号链接本身的信息
+        - 在默认情况下，返回的是符号链接锁指向的实际文件的信息
+      - fd 的值是 AT_FDCWD 表示的是 pathname 相对于当前进程的工作目录
+      - 如果 pathname 为绝对路径，fd 参数会被忽略。根据 flag 的值，和 stat 或 lstat 的作用一样
+    - buf 参数
+      - struct stat: ![struct stat:](images/f67857c1bb1caeb2559f53073d08053391e9875fdcdcdfcc810f5b833783173f.png)
+        - timespec struct ![timespec struct](images/15e115946f1da11fb7c7d0ee2788e67b2ff308633d4155e8ed8bdefd868ec96d.png)
+        - 文件长度
+          - struct stat 结构体中的 st_size 表示以字节为单位的文件的长度。此字段只对普通文件、目录文件和符号链接有意义
+          - FreeBSD 8.0、MacOS X 10.6.8 和 Solaris 10 对管道也定义了文件长度，它表示可从该管道中读到的字节数
+        - st_blocks 是所分配的实际 512 字节块的块数
+  - 文件类型
+    - 普通文件（regular file）
+    - 目录（directory file）
+      - 包含了其他文件的名字以及指向与这些文件有关信息的指针。对一个目录文件具有读权限的任一进程都可以读该目录的内容，但只有内核可以直接写目录文件
+    - 块特殊文件（block special file）
+      - 这种类型的文件提供对设备（如磁盘）带缓冲的访问，每次访问以固定长度为单位进行。
+    - 字符特殊文件（character special file）
+      - 这种类型的文件提供对设备不带缓冲的访问，每 次访问长度可变。系统中的所有设备要么是字符特殊文件，要么是块特殊文件。
+    - FIFO
+      - 也称命名管道（named pipe）
+    - 套接字（socket）
+      - 用于进程之间的网络通信。也可用于一台宿主机上进程之间的非网络通信
+    - 符号链接（symbolic link）
+      - 指向另一个文件
+    - POSIX.1允许实现将进程间通信（IPC）对象（如消息队列和信号量等）说明为文件。但是实际操作系统都没有将其表示为文件
+  - 设置用户 ID 和设置组 ID
+    - 与一个进程相关联的 ID 有 6 个或更多： ![与一个进程相关联的 ID 有 6 个或更多：](images/b08d0599d42cede95d7fe83c8922e2c4379a73702e06c7e37d335d568edf7d2a.png)
+      - 实际用户 ID 和实际组 ID 标识我们究竟是谁。这两个字段在登录时取自口令文件中的登录项。通常，在一个登录会话期间这些值并不改变，但是超级用户进程有方法改变它们
+      - 有效用户ID、有效组 ID 以及附属组 ID 决定了我们的文件访问权限。通常，有效用户 ID 等于实际用户 ID ，有效组 ID 等于实际组 ID。
+      - 保存的设置用户 ID 和保存的设置组 ID 在执行一个程序时包含了有效用户 ID 和有效组 ID 的副本
+    - 文件所有者和组所有者
+      - 每个文件都有一个所有者和组所有者，分别由 stat 结构体中的 st_uid 和 st_gid 指定
+    - st_mode 中有 2 个特殊的标志位：设置用户 ID（set-user-ID）位和设置组 ID（set-group-ID）位。
+      - 其作用是：当执行该文件时，将进程的有效用户 ID （st_uid）或有效用户组 ID 设置为文件的组所有者 ID（st_gid）
+      - 使用 S_ISUID 和 S_ISGID 宏来测试这两个位
+  - 文件访问权限
+    - 文件访问权限也包含在 stat 结构体中的 st_mode 字段中 ![文件访问权限也包含在 stat 结构体中的 st_mode 字段中](images/ad8d8a6ee548a268edd1bc21967eb5a069215d3e01b52cedecfea0dcf936885e.png)
+      - 用户 指的是文件所有者（owner）
+      - 3 类访问权限（读、写、执行）以各种方式有不同的函数使用。不同的使用方式：
+        - 用路径打开任一类型的文件时，对该路径中的每一级目录都要具有执行权限。这就是为什么对于目录其执行权限位常被称为搜索位的原因
+          - 如果 PATH 环境变量指定了一个不具有执行权限的目录，则 shell 不会在该目录下找到可执行文件
+        - 对于一个文件的读权限决定了我们是否能够打开现有文件进行读操作。这与open函数的O_RDONLY和O_RDWR标志相关。
+        - 对于一个文件的写权限决定了我们是否能够打开现有文件进行写操作。这与open函数的O_WRONLY 和O_RDWR 标志相关
+        - 为了在 open 函数中对一个文件指定 O_TRUNC 标志，必须对该文件具有写权限。
+        - 为了在一个目录中创建一个新文件，必须对该目录具有写权限和执行权限。
+        - 为了删除一个现有文件，必须对包含该文件的目录具有写权限和执行权限。对该文件本身则不需要有读、写权限。
+        - 如果用 7 个 exec 函数中的任何一个执行某个文件，都必须对该文件具有执行权限。该文件还必须是一个普通文件
+      - 内核对权限的认证：
+        - 如果进程的有效用户 ID = 0（超级用户），则允许访问
+        - 若进程的有效用户 ID = 文件的所有者 ID（进程拥有此文件），那么如果所有者对应的权限位被设置，则允许访问（例如，要读取该文件，则对应的读位应该为 1）
+        - 若进程的有效组 ID 或进程的附属组 ID 之一等于文件的组 ID，那么，如果组适当的权限位被设置，则允许访问
+        - 如果其他用户适当的权限位被设置，则允许访问
+    - 新文件和目录的所有权
+      - 新文件的用户 ID 设置为进程的有效用户 ID
+      - 新文件的组 ID 可以是进程的有效组 ID；也可能是所在目录的组 ID
+        - FreeBSD8.0和MacOSX10.6.8总是使用目录的组1D作为新文件的组ID。有些Linux文件系统使用 mount(1) 命令选项允许在 POSIX.1 提出的两种选项中进行选择。对于 Linux 3.2.0 和 Solaris10，默认情况下，新文件的组ID取决于它所在的目录的设置组ID位是否被设置。如果该目录的这一位已经被设置，则新文件的组ID设置为目录的组 ID；否则新文件的组 ID设置为进程的有效组 ID。
+  - access 和 faccessat 函数 ![access 和 faccessat 函数](images/7b9bb6a59bd8c56669b0f405d4c057767270366f9f9dcd19668d2508f765ce65.png)
+    - 使用实际用户 ID 和实际组 ID 进程权限认证，而不是使用有效用户 ID 和有效组 ID
+    - 其作用只是用于判断实际用户 ID 或实际用户组 ID 是否对某个文件有某种权限
+    - 测试文件是否已经存在，使用 F_OK mode，否则 mode 就是上图常量的按位或 ![测试文件是否已经存在，使用 F_OK mode，否则 mode 就是上图常量的按位或](images/dd0356275036cd96c053e867ed3f52d50f416fde3f84f1d34f09069c8f2f9c12.png)
+    - faccessat 函数的 flag 参数改变该函数的行为
+      - flag = AT_EACCESS，访问检查用的是调用进程的有效用户 ID 和有效组 ID，而不是实际用户 ID 和实际组 ID
+  - umask 函数
+    - 为进程设置文件模式创建屏蔽字，并返回之前的值
+    - cmask 是上图中 9 个常量的按位或构成的 ![cmask 是上图中 9 个常量的按位或构成的](images/8a320a96bd31b38262b2f98fec2bf5023cc118c88edcb2d8ef4d636a48a45dfd.png)
+    - 在文件模式创建屏蔽字为 1 的位，在文件模式中的相应为一定会被关闭
+    - 此函数不会改变其他进程的 umask
+  - chmod、fchmod 和 fchmodat 函数 ![chmod、fchmod 和 fchmodat 函数](images/0d452177d7d909b2a79eb31fd2324f9ad783b0b165335993a902b8a135fff19e.png)
+    - 更改现有文件的访问权限
+    - fchmodat 的 flag 参数改变 fchmodat 的行为，设为 AT_SYMLINK_NOFOLLOW 标志时，不会跟随符号链接
+    - 为了改变一个文件的权限位，进程的有效用户 ID 必须等于文件的所有者 ID，或者该进程必须具有超级用户权限
+    - mode 参数 ![mode 参数](images/abf4ef2b912aecd7a6a52944177025ef4c0c7966b408abd530b8568987602584.png)
+      - 粘着位（保存正文位 saved-text bit）
+        - 如果对可执行文件设置此位，那么当程序第一次被执行，在其执行时，程序的正文部分的一个副本仍被保存在交换区，使得下次执行程序时能较快地将其装载如内存
+        - 如果对目录设置此位，则只有对该目录具有写权限且满足下列条件之一，才能删除或重命名该目录下的文件
+          - 拥有此文件
+          - 拥有此目录
+          - 是超级用户
+  - chown、fchown、fchownat 和 lchown 函数 ![chown、fchown、fchownat 和 lchown 函数](images/3440978ae20a1e3a45c6eed9dc11199e07fe41f5a872e38f28ce25aa5dc640ac.png)
+    - lchown 的功能与 chmod 类似，但是不会跟随符号链接（与 fchownat 中 flag = AT_SYMLINK_NOFOLLOW 效果一样）
+    - 基于 BSD 的系统（包括 Linux， Mac OS）一直规定只有超级用户才能更改一个文件的所有者。这样做的原因是防止用户改变其文件的所有者从而摆脱磁盘空间限额对他们的限制
+      - 如果某个进程拥有该文件（进程的有效用户 ID = 该文件的用户 ID），参数 owner = -1 或文件的用户 ID，且 group 等于进程的有效组 ID 或进程的附属组 ID 之一，那么一个非超级用户进程可以更改该文件的组 ID
+        - _POSIX_CHOWN_RESTRICTED 生效时的行为
+        - 这意味着，当 _POSIX_CHOWN_RESTRICTED 有效时，不能更改其他用户文件的用户ID。可以更改所拥用的文件的组ID，但只能改到当前用户所属的组。
+      - 而按照 System V 则允许任意用户更改他们所拥有的文件的所有者
+  - truncate 和 ftruncate 函数 ![truncate 和 ftruncate 函数](images/18d2a76dfbc2d4a11c8202f70df069b68b95bc489118a4f9e02fa9fa7f681490.png)
+    - 在文件尾端处截断一些数据以缩短文件
+    - 这两个函数将一个现有文件长度截断为length
+      - 如果该文件以前的长度大于length，则超过length 以外的数据就不再能访问
+      - 如果以前的长度小于length，文件长度将增加，在以前的文件尾端和新的文件尾端之间的数据将读作0（也就是可能在文件中创建了一个空洞）
+  - 文件系统
+    - 可以将磁盘分成一个或多个分区。每个分区可以包含一个文件系统。
+    - 磁盘、分区和文件系统。i-node 是固定长度的记录项，包含了有关文件的大部分信息 ![磁盘、分区和文件系统。i-node 是固定长度的记录项，包含了有关文件的大部分信息](images/e0daee23e34755926d5d0aa07987107c54ae6c8c31049cb4185e209601f6247e.png)
+    - i-node 与 数据块 ![i-node 与 数据块](images/4a1260ef9c271e6b4f1fa5cb3082fd1f393fc92d50ea6ad03edf378e7110847f.png)
+      - 每个 inode 都有一个链接计数（struct stat 结构体中的 st_nlink 字段），其值是指向该 inode 的目录项数（被称为硬链接），只有当链接计数减少至 0 时，才可删除该文件
+      - 符号链接（symbolic link）的实际内容是该符号链接所指向的文件的名字。符号链接的 i-node 的文件类型是 S_IFLNK。
+        - 为了解决硬链接的限制：
+          - 通常要求链接和文件位于同一个文件系统中
+          - 只有超级用户才能创建指向目录的硬链接
+        - 函数对符号链接的处理 ![函数对符号链接的处理](images/9a720546344a8931c9d08632ebd45f96549f826cbcf492c4728ab66b10cb27e4.png)
+      - inode 存储了文件有关的所有信息，但是有两项重要的数据存放在目录项中：文件名和 inode 编号，inode 编号的数据类型是 ino_t
+        - 因为目录项不能指向其它文件系统的 inode，所以，ln（1）命令不能跨文件系统创建链接
+    - 进程与 inode ![进程与 inode](images/7a8a289a0672bf8a8ab67354cc7f54bb7ff538974118744587c9fc5d3a36844a.png)
+  - link、linkat、unlink、unlinkat 和 remove 函数
+    - link 和 linkat ![link 和 linkat](images/57046a4ce25c3eba61bb4e4ec3687e61f14e70d342c200b4ba090ccd89201483.png)
+      - 创建的是硬链接
+      - 创建一个新目录项 newpath，引用现有文件 existingpath
+      - 如果 newpath 已经存在，则出错。只创建 newpath 的最后一个分量，路径中的其他部分应当已经存在
+      - linkat 函数的现有文件由 efd 和 existingpath 共同指定
+      - flag 参数控制 linkat 函数是创建指向现有符号链接的链接（AT_SYMLINK_NOFOLLOW）还是创建现有符号链接指向的文件的链接 （AT_SYMLINK_FOLLOW）
+    - unlink 和 unlinkat ![unlink 和 unlinkat](images/3adaa1b39b67e93e3ba76fc27a2c28cc9703ce97c8542414446a501cc4f4b7bc.png)
+      - 删除目录项，并将有 pathname 所引用文件的链接计数减一
+      - flag = AT_REMOVEDIR 时，可以删除目录
+      - 如果 pathname 打开的文件有进程已经打开了它，则不会立刻删除该文件
+    - remove ![remove](images/f6b81e1b848973c70e868967f0b41d8d3bb2187d4611366561093cb47424aeea.png)
+      - 解除对一个文件或目录的链接。对于文件，remove 的功能与 unlink 相同，对于目录，remove 的功能与 rmdir 相同
+  - rename 和 renameat ![rename 和 renameat](images/d13f70b84edba5b32b950e47b5e0bdb10d1d3db66ac03c0056b377798f52d45e.png)
+    - oldname
+      - 若 oldname = 文件，如果 newname 已存在，则它不能是一个目录。然后，将原来的目录项删除然后将 oldname 重命名为 newname。调用进程对于这两个目录都要具有写权限，因为将更改这两个目录
+      - 若 oldname = 目录，则为该目录重命名。如果 newname 已经存在，则必须引用一个空目录
+    - 如果 oldname 或 newname 是符号链接，则处理的是符号链接本身
+  - symlink 和 symlinkat 函数 ![symlink 和 symlinkat 函数](images/f0dcce26921f01608468d458e4ebf86b586e20cc88d407eae2afe33138b3547d.png)
+    - 创建指向 actualpath 的新目录项 sympath
+    - 不要求 actualpath 已经存在
+  - readlink 和 readlinkat 函数 ![readlink 和 readlinkat 函数](images/93074f5d623d5e4e504821a9f5bea2fad2ce7972b6ab97653bba673d9ba6cce1.png)
+    - 因为 open 函数跟随符号链接，所以，需要这两个函数来打开链接本身，并读取该连接中的路径（名字）
+    - 返回的符号链接的内容不以 null 字节结尾
+  - 文件的时间
+    - 与每个文件相关的 3 个时间值 ![与每个文件相关的 3 个时间值](images/8e843fb327901ebd8eaaf8989a3b299b506a331c0ea81096e8653538cf23c56f.png)
+    - 各种函数对访问、修改和状态更改时间的作用 ![各种函数对访问、修改和状态更改时间的作用](images/9fc46ee1ba999bba2e09d3514ef3339a670a5484f2cba40181414bc17eb2f887.png)
+  - futimens、utimensat 和 utimes ![futimens、utimensat 和 utimes](images/9984e9aa449bf5152900b3d7e2363f7f901244da003b706ef89faed0772a0138.png)
+    - 对一个文件的访问和修改时间可以用这几个函数更改
+    - times 的第一个元素包含访问时间，第二个元素包含修改时间
+      - 如果 times = null，则访问时间和修改时间都设置为当前时间
+      - 如果 times 中的数组元素的 tv_nsec 字段的值为 UTIME_NOW，则相应的时间就设置为当前时间，忽略当前的 tv_sec 字段
+      - 如果 times 中的数组元素的 tv_nsec 的值为 UTIME_OMIT，则相应的时间戳保持不变，忽略相应的 tv_sec 字段
+      - 如果不是上述情况，将对应的时间设置为指定的参数
+    - utimes 函数 ![utimes 函数](images/0e96653339ada0246507877c382c94fedc97339d7a811554988372854bde6c3b.png)
+      - 对路径进行操作
+      - struct timeval ![struct timeval](images/32721aa10504b046d455ee4425f86d01f5ce84a710f551d4148b5907ad0e7250.png)
+  - mkdir、mkdirat 和 rmdir 函数 ![mkdir、mkdirat 和 rmdir 函数](images/41115bc5652f0fb0c19e64d64e6e398249d9b83365a923c4976703d1aac203d5.png)
+    - . 和 .. 目录自动创建
+    - mode 指定目录的权限
+    - rmdir 函数 ![rmdir 函数](images/94003fe9e67eff7dad8674d2fd39c4d0ef889cb38b07d4b98ecb0e70f6d39541.png)
+      - 只能删除空目录
+  - 读取目录
+    - 函数 ![函数](images/7570b7f6717901b10e8dc613fc8a24902fe904fe3931a5e7c95aa6dd041b88ec.png)
+      - fdopendir 函数将打开的文件描述符转换成目录处理函数需要的 DIR 结构
+  - chdir、fchdir 和 getcwd 函数 ![chdir、fchdir 和 getcwd 函数](images/3c468dae6f8558eae5a66a997458b27311381f410b76331c62c49300b6383c8b.png)
+    - chdir 和 fchdir 可以改变当前工作目录
+    - getcwd ![getcwd](images/b0931245e60c377d3fd6ca2f21a3dea0afe67dc1e3fe28b04d3f7367a70a3a0c.png)
+  - 设备特殊文件
+    - struct stat 结构体中的 st_dev 和 st_rdev
+    - 每个文件系统所在的存储设备都主要由主、次设备号表示
+      - 设备号所用的数据类型是基本系统数据类型 dev_t。主设备号标识设备驱动程序；次设备号标识特定的子设备
+      - 例如：一个磁盘驱动器包含多个文件系统，这些文件系统具有相同的主设备号，但是次设备号却不同
+      - 可以使用 major 和 minor 来分别访问主、次设备号。其中，这两个宏的参数都是 st_dev
+    - 系统中与每个文件名关联的 st_dev 值是文件系统的设备号，该系统包含了这一文件名及其对应的 inode
+    - 只有字符特殊文件和块特殊文件才有 st_rdev 。此值包含实际设备的设备号
+  - 文件访问权限总结 ![文件访问权限总结](images/e4c7e247d774fd6603c3c4b45a47cb9291d7684239506a29cb71c74d9bf9246c.png)
+- 无缓冲 I/O（unbuffered I/O）
+  - 指的是这些函数都调用内核中的一个系统调用
+  - open 或 openat 函数用于打开或创建一个文件 ![open 或 openat 函数用于打开或创建一个文件](images/db66caefd103506d561d2455789c19d17f499735035f6127a701af4da5340685.png)
+    - path 是打开或创建文件的名字
+    - oflag 参数
+      - O_RDONLY
+        - 只读打开
+      - O_WRONLY
+        - 只写打开
+      - O_RDWR
+        - 读写打开
+      - O_EXEC
+        - 只执行打开
+      - O_SEARCH
+        - 只搜索打开（应用于目录）
+        - O_SEARCH常量的目的在于在目录打开时验证它的搜索权限。对目录的文件描述符的后续操 作就不需要再次检查对该目录的搜索权限
+      - O_APPEND
+        - 每次写时都追加到文件的末尾
+      - O_CLOEXEC
+        - 把 FD_CLOEXEC 常量设置为文件描述符标志
+      - O_CREAT
+        - 如果此文件不存在则创建它
+        - 使用此选项时，open 函数需要同时说明函数的最后一个参数 mode。用 mode 来指定该新文件的访问权限位
+      - O_DIRECTORY
+        - 如果 path 引用的不是目标目录，则出错
+      - O_EXCL （exclusive 独占）
+        - 如果同时指定了 O_CREAT，而文件已存在，则出错
+        - 可以用来测试一个文件是否已经存在，如果不存在，则创建此文件，这时测试和创建两者成为一个原子操作
+      - O_NOCTTY
+        - 如果 path 引用的是终端设备，则不将该设备分配为此进程的控制终端
+      - O_NOFOLLOW
+        - 如果 path 引用的是一个符号链接，则出错
+      - O_NONBLOCK
+        - 如果 path 引用的是一个 FIFO、一个块特殊文件或者一个字符特殊文件，则此选项为本次打开操作和后续的 IO 操作设置为非阻塞方式
+      - O_SYNC
+        - 使每次 write 等待物理 IO 操作完成，包括由该 write 操作引起的文件属性更新所需的 IO
+      - O_TRUNC
+        - 如果此文件存在，而且为只写或读写成功打开，则将其长度截断为 0
+      - O_TTY_INIT
+        - 如果打开一个还未打开的终端设备，设置非标准的 termios 参数值，使其符合 Single UNIX Specification
+      - O_DSYNC （Data Sync）
+        - 使每次 write 操作要等待物理 IO 完成，但是如果该写操作并没有添加或减少新的字节，而是改写现有的字节，则文件的时间属性不会同步更新。
+        - 与 O_SYNC 标志的区别
+          - O_DSYNC 仅当文件属性关于数据的部分需要更新时，才会同时阻塞更新文件属性的这一部分 IO。所以，如果仅仅是改写文件内容，则不需要等待文件属性的 IO
+          - O_SYNC 对文件的每一次 write 操作都将在 write 返回前更新文件时间，这与是否改写现有字节或追加、写文件无关
+      - O_RSYNC
+        - 使每一个以此文件描述符作为参数进行的 read 操作等待，直至所有对文件同一部分挂起的写操作都完成
+    - openat 函数希望解决的问题
+      - 让线程可以使用相对路径名打开目录中的文件，而不再用相对路径打开文件时，只能相对于当前工作目录
+      - 避免 time-of-check-to-time-of-use（TOCTTOU）错误
+        - TOCTTOU 错误：如果有两个基于文件的函数调用，其中第二个调用依赖于第一个调用的结果，那么程序是脆弱的。因为两个调用并不是原子操作，在两个函数调用之间文件可能改变了，这样也就造成了第一个调用的结果就不再有效，使得程序最终的结果是错误的。
+    - fd 参数
+      - 如果 path 参数指定的绝对路径名，则忽略 fd 参数，openat 函数相当于 open 函数
+      - 如果 path 参数指定的是相对路径名，fd 参数表示相对路径名在文件系统中的开始地址，fd 参数是通过打开相对路径名所在的目录来获取
+      - 如果 path 是相对路径，且 fd = AT_FDCWD，则路径名在当前工作目录中获取
+    - open 和 openat 函数返回的文件描述符一定是最小的未用描述符的数值
+    - 可以使用常量 _POSIX_NO_TRUNC 决定是否截断过长的文件名或路径名。如果不截断，则出错，并将 errno 设置为 ENAMETOOLONG
+  - create 函数创建一个文件 ![create 函数创建一个文件](images/246a9b91dbe9854ca0f425371cbf547a3ce5dc676f0fd0568d0db0a6b9cf1de7.png)
+    - 等价于 ![等价于](images/09c5c23bd2cdedc27631cb09630df0e7444f28dcea84859a158f1baca1754c09.png)
+    - 以只写的方式打开所创建的文件
+  - close 函数用来关闭一个打开的文件 ![close 函数用来关闭一个打开的文件](images/c1c1c315b8d0721f9aa93e9979089b78edf88cebc4d88e7cf58f809eba792b82.png)
+    - 关闭一个文件时，还会释放该进程加在文件上的所有记录锁
+    - 当进程终止时，内核会自动关闭它所有打开的文件
+  - lseek 函数显式地设置文件偏移量 ![lseek 函数显式地设置文件偏移量](images/45af3a7c4707e87626ed242e9b0f28cb305bc504a5c55fb1bbe4b1cd0a2bb927.png)
+    - 每个打开的文件都有一个与其关联的当前文件偏移量（current file offset），通常是一个非负整数，用以度量从文件开始处计算的字节数
+      - 通常，读写操作都从当前文件偏移量开始，并使偏移量增加锁读写的字节数
+      - 按系统默认情况，偏移量被设置为 0。除非指定了 O_APPEND 选项
+    - 对 offset 的解释与 whence 有关
+      - whence = SEEK_SET
+        - 该文件的偏移量设置为距文件开始处offset个字节
+      - whence = SEEK_CUR
+        - 将该文件的偏移量设置为其当前值加offset，offset可为正或负
+      - whence = SEEK_END
+        - 该文件的偏移量设置为文件长度加offset，offset 可正可负
+    - off_t 类型
+      - 大多数平台使用两组接口以处理文件偏移量，一组使用 32 位文件偏移量，另一组使用 64 位文件偏移量
+      - 可以通过 sysconf 函数确定支持何种 ![可以通过 sysconf 函数确定支持何种](images/34436c94b7ea6eb12d3c4c697b621ffe3526c853e2683b2bd4bd75b9c0cc0a24.png)
+      - c99编译器要求使用 getconf(1) 命令将所期望的数据大小模型映射为编译和链接程序所需的标志。根据每个平台支持环境的不同，可能需要不同的标志和库。
+      - 或者可以将符号常量 _FILE_OFFSET_BITS 设置为 64,以支持 64 位偏移量。但是这种方法并不能保证应用程序是可移植的
+        - 定义为了 32 之后，offset 仍为 8 字节 ![定义为了 32 之后，offset 仍为 8 字节](images/f61b3339159831f0a956bfd60bda7ded5fe42f4f7cf93832a2e3b868a751b03e.png)
+    - 当文件偏移量大于当前文件的长度时，将在下一次写操作时加长该文件，并在文件中构成一个空洞。空洞内的数据都被视为 0。
+      - 文件中的空洞并不要求在磁盘上占用空间，具体如何处理取决于文件系统
+    - 如果文件描述符指定的是一个管道、FIFO 或网络套接字，则 lseek 返回 -1，并将 errono 设置为 ESPIPE
+    - 某些设备可能允许负的偏移量，故而判断 lseek 是否出错要使用 == -1，而不能使用 &lt; 0
+  - read 函数从打开文件中读取数据 ![read 函数从打开文件中读取数据](images/33e4f158ca1aaa41ffdca69914e22178b0d0e5fca40eb70792762f5618156bdd.png)
+    - 如 read 成功，则返回读到的字节数。如已到达文件的尾端，则返回 0。
+    - 读到的字节数小于指定要读的字节数的情况
+      - 读普通文件时，在读到要求字节数之前已到达了文件尾端。例如，若在到达文件尾端之前有30个字节，而要求读100个字节，则read返回30。下一次再调用read时，它将返回0（文件尾端）
+      - 当从终端设备读时，通常一次最多读一行（第18章将介绍如何改变这一点）
+      - 当从网络读时，网络中的缓冲机制可能造成返回值小于所要求读的字节数。
+      - 当从管道或FIFO读时，如若管道包含的字节少于所需的数量，那么read将只返回实际 可用的字节数
+      - 当从某些面向记录的设备（如磁带）读时，一次最多返回一个记录
+      - 当一信号造成中断，而已经读了部分数据量时， 读操作从文件的当前偏移量处开始，在成功返回之前，该偏移量将增加实际读到的字节数
+  - write 函数用于向打开文件写数据 ![write 函数用于向打开文件写数据](images/6ede9225604cf1542b5c591824c2b556869df391e9a0854837cb3b0dd11cf9fb.png)
+    - 返回值通常与参数 nbytes 相同，否则，表示出错。
+    - 出错的原因可能是磁盘已满或者超过了一个给定进程的文件长度限制
+  - 文件共享
+    - UNIX 系统支持在不同进程之间共享地打开一个文件
+    - 内核使用 3 中数据结构来表示打开的文件，它们之间的关系决定了在文件共享方面一个进程对另一个进程可能产生的影响
+      - 每个进程在进程表中都有一个记录项，其包含打开的文件描述符表，每个描述符在该表中占用一项
+        - 与每个文件描述符关联的是
+          - 文件描述符标志
+          - 指向文件表项的一个指针
+        - 图解 ![图解](images/6f5f635183405f964fac13bdaebeda69ff3be0a5578beb9dd7bd0d7aba2b9695.png)
+      - 内核为所有打开文件维护一张文件表，每个文件表项包含：
+        - 文件状态标志（读、写、读写和非阻塞等）
+        - 当前文件的偏移量
+        - 指向该文件 v-node 表项的指针。创建 v 节点结构的目的是对在一个计算机系统上的多文件系统类型提供支持。
+        - 图解 ![图解](images/a7b111ea169b2e42819b038309ecc657324566f8b3b4989fe8572f2ccca138b0.png)
+      - 每个打开文件（或设备）都有一个 v-node 结构
+        - v-node 包含了文件类型和对此文件进行各种操作的函数的指针
+        - 对于大多数文件，v 节点还包含了该文件的 i-node 索引节点，包含了文件的所有者、文件长度、指向文件实际数据块在磁盘上所在位置的指针等
+        - 图解 ![图解](images/cd32c3892064aea36838f24a4a58664c6b017eac462d9a89f9bfb0e49cc321a8.png)
+  - pread 和 pwrite 函数（p 指的是 position） ![pread 和 pwrite 函数（p 指的是 position）](images/32925b688ec0292b40e204615cd22b8c99c621534c1c320d6fafca2a7d6f9a13.png)
+    - 允许原子性地定位并执行 I/O
+    - 这些函数不更新当前文件的偏移量
+  - dup 和 dup2 函数 ![dup 和 dup2 函数](images/7740f075760200d2764d3ee70d93d51a931b5ce3bfad8e8f524339c67e2bb4ca.png)
+    - 用来复制现有的一个文件描述符
+    - 由 dup 返回的新文件描述符一定是当前可用文件描述符中的最小数值，
+    - dup2 可以用 fd2 参数指定新描述符的值
+      - 如果 fd2 已经打开，则先将其关闭
+      - 如果 fd = fd2，则 dup2 返回 fd2，而不关闭它
+      - 否则，fd2 的 FD_CLOEXEC 文件描述符标志就会被清除，这样 fd2 在进程调用 exec 时是打开状态，不会被关闭（exec 执行的程序具有 fd2 文件描述符）
+  - sync、fsync、fdatasync 函数 ![sync、fsync、fdatasync 函数](images/ac0bc7f7108e99ca9d606766944a451cf53fa4838928ab29a7bb8e53f082ce27.png)
+    - 传统的 UNIX 系统实现在内核中设有缓冲区高速缓存或页高速缓存，大多数磁盘 IO 都通过缓冲 区进行。当我们向文件写入数据时，内核通常先将数据复制到缓冲区中，然后排入队列，晚些时候再写入磁盘。这种方式被称为延迟写（delayedwrite）
+    - sync 只是将所有修改过的块缓冲区排入写队列，然后就返回，它并不等待实际写磁盘操作结束（在 linux 中，sync 函数等待磁盘操作结束才返回）
+      - 会有一个守护进程周期性地调用 sync 函数
+    - fsync 只对有文件描述符 fd 指定的一个文件起作用
+    - fdatasync 类似与 fsync，但是只影响文件的数据部分。除了数据外，fsync 还会同步更新文件的属性
+  - fcntl 函数 ![fcntl 函数](images/484ce4f68235cb8b5d92223ea730530876e92ebb5dff952c779f73153a3cc4b3.png)
+    - 有 5 种功能
+      - 1.复制一个已有的描述符（cmd = F_DUPFD 或 F_DUPFD_CLOEXEC）
+      - 2.获取/设置文件描述符标志（cmd = F_GETFD 或 F_SETFD）
+      - 3.获取/设置文件状态标志（cmd = F_GETFL 或 F_SETFL）
+      - 4\. 获取/设置记录锁（cmd = F_GETLK、F_SETLK 或 F_SETLKW）
+      - 5.获取/设置异步 I/O 所有权（cmd = F_GETOWN 或 F_SETOWN）
+    - cmd
+      - F_DUPFD
+        - 复制文件描述符 fd。新文件描述符作为函数值返回。返回值是尚未打开的各描述符中大于或等于第 3 个参数值（取为整型值）中各值的最小值
+        - 新描述符与 fd 共享同一文件表项。但是，新描述符有它自已的一套文件描述符标志，其 FD_CLOEXEC 文件描述符标志被清 除（这表示该描述符在exec时仍保持有效）
+      - F_DUPFD_CLOEXEC
+        - 复制文件描述符，设置与新描述符关联的FDCLOEXEC文件描述符标志的值，返回新文件描述符。
+      - F_GETFD
+        - 对应于 fd 的文件描述符标志作为函数值返回。当前只定义了一个文件描述符标志 FD_CLOEXEC。
+      - F_SETFD
+        - 对于 fd 设置文件描述符标志,新标志值按第 3 个参数（取为整型值）设置。
+      - F_GETFL
+        - 返回 fd 的文件状态标志，就是 open 函数的 oflags 参数 ![返回 fd 的文件状态标志，就是 open 函数的 oflags 参数](images/4799dff059fccb24091ffe2ee57013b404c0b6ad3b712419e4cbb6c15f5decc0.png)
+          - 5个访问方式标志（O_RDONLY、O_WRONLY、O_RDWR、O_EXEC 以及O_SEARCH ）并不各占1位（由于历史原因，前3个标志的值分别是0、1和 2。这 5 个值互斥，一个文件的访问方式只能取这 5 个值之一）。因此首先必须用屏蔽字O_ACCMODE 取得访问方式位，然后将结果与这 5 个值中的每一个相比较。
+            - 例如 ![例如](images/c203c4657ac86a1e0a21d4ed8a5540d3bb160e8fc3c1a7f507a2e1185300eadf.png)
+      - F_SETFL
+        - 将文件状态标志设置为第 3 个参数的值（取为整型值）。可以更改的几个标志是:O_APPEND、O_NONBLOCK、O_SYNC、O_DSYNC、O_RSYNC、 O_FSYNC 和 O_ASYNC.
+      - F_SETOWN
+        - 获取当前接收 SIGIO 和 SIGURG 信号的进程 ID 或进程组 ID
+      - F_SETOWN
+        - 设置接收 SIGIO 和 SIGURG 信号的进程 ID 或进程组 ID。正的 arg 指定一个进程 ID，负的 arg 表示等于 arg 绝对值的一个进程组 ID。
+  - ioctl 函数 ![ioctl 函数](images/6c8fcf8c6869641a224e369e1e440c9a9378025fd09b054f91b341727c898164.png)
+    - IO 操作的杂物箱
+    - 终端 IO 的命令都需要头文件 termios.h
+    - 每个设备驱动程序可以定义它自己专用的一组 ioctl 命令，系统则为不同种类的设备提供 通用的 ioctl 命令
+    - FreeBSD 支持的通用 ioctl 命令的一些类别 ![FreeBSD 支持的通用 ioctl 命令的一些类别](images/f47a2c51873e7fa6ea00e3d3f61ed2efe0af3e8c019794c48b0e6f5e27583a3c.png)
+  - /dev/fd 目录
+    - 打开文件 /dev/fd/n 等效与使用 dup 函数复制文件描述符 n
+    - 调用 open("/dev/fd/0", accessmode)，系统会忽略掉 accessmode 参数，而其他的 flags 参数会被解析
+      - 例如，若描述符 0 先前被打开为只读，那么 也只能对 fd 进行读操作。即使系统忽略打开模式，而且下列调用是成功的（但是仍然不能对 fd 进行写操作）： ![例如，若描述符 0 先前被打开为只读，那么 也只能对 fd 进行读操作。即使系统忽略打开模式，而且下列调用是成功的（但是仍然不能对 fd 进行写操作）：](images/e6acc1d418b2345f4540a69d881f820fca87b2005cdd72aedcc5e02a2900b1ac.png)
+      - Linux 与上述语义不同： ![Linux 与上述语义不同：](images/3398a7b76a5bff26b1cf4b2636e6fb36088c65b5b96c511ed06b95f4b03f954b.png)
+- 标准 I/O
+  - 流和 FILE 对象
+    - 流
+      - 标准 IO 库围绕流（stream） 进行
+      - 流的定向（stream's orientation）决定所读、写的字符是单字节的还是多字节的
+        - 当一个流最初被创建时，它并没有定向。
+        - 如果在未定向的流上使用一个多字节 IO 函数（&lt;wchar.h&gt;），则将该流的定向设置为宽定向的。同理，在使用单字节 IO 函数时，会将流定向为单字节定向的
+        - 只有两个函数可以改变流的定向
+          - fwide 函数用于设置流的定向 ![fwide 函数用于设置流的定向](images/fe55737b164d39f744b2bddb4829b97a213c129b76fb5025add826414946fe6c.png)
+            - mode &lt; 0,尝试使指定的流指定为字节定向
+            - mode = 0,不改变流的定向，只返回流的定向的值
+            - mode &gt; 0,尝试是指定的额流指定为宽定向的
+            - fwide 并不改变已定向流的定向
+            - 没有出错返回，只能在调用之前清除 errno，然后调用完成之后检查 errno
+    - FILE 对象
+      - fopen 函数返回一个指向 FILE 对象的指针，包含了用于实际 IO 的文件描述符，指向用于该流缓冲区的指针，缓冲区的长度，当前在缓冲区的字符数和出错标志等
+      - 每个进程都预定一了文件指针（FILE* 类型的指针） stdin, stdout, stderr 以引用标准输入，标准输出，标准错误
+  - 缓冲
+    - 标准 IO 提供了 3 中类型的缓冲
+      - 全缓冲
+        - 在填满缓冲区之后才进行实际 IO 操作
+      - 行缓冲
+        - 当在输入或输出中遇到换行符时，标准 IO 库执行 IO 操作
+        - 只要填满了缓冲区，即使没有遇到换行符也执行 IO 操作
+        - 如果从一个不带缓冲的流或者从一个行缓冲的流中得到输入数据，就会冲洗所有行缓冲输出流
+      - 不带缓冲
+        - 标准 IO 库不对字符进行缓冲存储
+        - stderr 流通常是不带缓冲的
+    - ISO C 要求的缓冲
+      - 当且仅当标准输入和标准输出并不指向交互式设备时，它们才是全缓冲的
+      - 标准错误绝不会是全缓冲的
+    - setvbuf 函数改变任意流的缓冲类型，setbuf 函数打开或关闭缓冲机制 ![setvbuf 函数改变任意流的缓冲类型，setbuf 函数打开或关闭缓冲机制](images/f76101a8aebc847a20fa3a407cc0a66202f913f2cff74033e78ae50698971a49.png)
+      - setbuf 函数：为了带缓冲进行 IO，参数 buf 必须指向一个长度为 BUFSIZ（&lt;stdio.h&gt;） 的缓冲区，通常再调用之后该流是全缓冲的，但是如果该流于一个终端设备相关，某些系统也可能将其设置行缓冲的
+      - 为了关闭缓冲，将 setbuf 的 buf 参数设置为 NULL
+      - setvbuf 函数的 mode 参数可以用于指定缓冲的类型
+        - _IOFBF，全缓冲
+        - _IOLBF，行缓冲
+        - _IONBF，不带缓冲
+      - 子主题 4
+    - 使用 fflush 函数来强制冲刷一个流 ![使用 fflush 函数来强制冲刷一个流](images/100b952426b6c82095df7336f3d0e5d05908f22e2d1e45ae4c6892dca134c3a4.png)
+      - 如果 fp = NULL，则将导致所有输出流都没冲刷
+  - 打开流 ![打开流](images/ec3ac4b28a4fd06f0233c598e2b450ee516d0a8e2840ca2b1518a546cfc5c21d.png)
+    - fopen 函数代开路径为 pathname 的指定文件
+    - freopen 函数在一个指定的流上打开一个指定的文件，如果该流已经打开，则先关闭该流；如果该流已经定向，则会清除该定向
+      - 一般用于井一个指定的文件打开为一个预定义的流：标准输入，标准错误和标准输出
+    - fdopen 将标准 IO 流与文件该描述符相结合
+      - 常用于将管道和网络通信通道函数返回的文件描述符与标准 IO 流相结合
+    - type 参数
+      - 参数 ![参数](images/aefb0c3c29194ec530420fee19d1f11c5538cf49ae1ca0eb6abae0d9742b3887.png)
+        - 使用字符b作为type的一部分，这使得标准IVO系统可以区分文本文件和二进制文件。因为UNIX内核并不对这两种文件进行区分，所以在UNTIX系统环境下指定字符b作为type的一部分实际上并无作用。
+        - fdopen 函数不会截断文件，也不会创建文件
+      - 当以读和写类型打开一个文件时（type 中含有 + 号），有下列限制：
+        - 如果中间没有fflush、fseek、fsetpos 或rewind，则在输出的后面不能直接跟随输入
+        - 如果中间没有fseek、fsetpos或rewind，或者一个输入操作没有到达文件尾端，则在输入操作之后不能直接跟随输出。
+      - 当 type 中有 w 或 a 创建一个新文件时，POSIX.1 规定使用下面的权限位来创建文件： ![当 type 中有 w 或 a 创建一个新文件时，POSIX.1 规定使用下面的权限位来创建文件：](images/8cdbc164d4420e94c8919d88f7583b5b386502919658a286f33a6a646d258dab.png)
+  - 关闭流 ![关闭流](images/465f8a79f3203461b2c586f94f43aecbad7052a157df6a5cbe6cb2f00c1eed08.png)
+    - 在该文件被关闭之前，冲洗缓冲中的输出数据。缓冲区中的任何输入数据被丢弃。如果标准 I/O库已经为该流自动分配了一个缓冲区，则释放此缓冲区。
+    - 当一个进程正常终止时（直接调用exit函数，或从main函数返回），则所有带未写缓冲数 据的标准I/O流都被冲洗，所有打开的标准1VO流都被关闭。
+  - 读写流
+    - 非格式化 IO
+      - 每次一个字符的 IO
+        - 子主题 1
+        - 读 ![读](images/130281367d743f007e57fdfde4092433f6360e17533bfa0b718c12a7f24e5722.png)
+          - getchar 从 stdin 中读取字符
+          - getc 可以被实现为宏，fgetc 不能实现为宏
+          - 这三个函数不论是出错还是到达文件的末尾都返回相同的值，为了区分这两种不同的情况，应使用 ferror 和 feof 函数 ![这三个函数不论是出错还是到达文件的末尾都返回相同的值，为了区分这两种不同的情况，应使用 ferror 和 feof 函数](images/e884216c361e39fb641b1e57ee358b0e9dd867ca8b82e5b935570835148a441b.png)
+            - 在大多数实现中，在 FILE 对象中维护了两个标志：出错标志和文件结束标志
+            - 调用 clearerr 可以清除上述两个标志
+        - 写
+          - ungetc 函数可以字符压回到流中
+            - 不能压回 EOF
+            - 当已经到达文件尾端时，仍可以回送一个字符。下次读将返回该字符，再读则返回EOF。之所以能这样做的原因是，一次成功的ungetc调用会清除该流的文件结束标志。
+            - 压回的顺序与读取的顺序相反
+          - 输出函数 ![输出函数](images/302068d32290e3ee47c8bad33751d881af8cf04f7a4cbbaa923d53df02c7597a.png)
+            - 与输入函数一样，putchar(c)等同于putc(c，stdout），putc 可被实现为宏，而 fputc 不能实现为宏。
+      - 每次一行 IO
+        - 读
+          - fgets 和 gets 函数 ![fgets 和 gets 函数](images/0fc19941c1ca0110aed9e927426bce866f0c5148f20ee5630b3716550a73fdcb.png)
+          - gets 从标准输入读
+            - 不推荐使用，因为不能指定缓冲区的长度
+            - gets 不将换行符存储缓冲区中
+          - fgets 函数必须指定缓冲区的长度 n。此函数读取不超过 n - 1 个字符，缓冲区以 null 字节结尾
+        - 写
+          - fputs 和 puts 函数 ![fputs 和 puts 函数](images/5a1077f62d6b3a524dbbc9967e47d64602a7bd7825303dd08fb9dafe5febbcba.png)
+      - 直接 IO（二进制 IO）
+        - 每次 IO 操作读或写某种数量的对象，而每个对象具有指定的长度
+        - 读写函数： fread、fwrite ![读写函数： fread、fwrite](images/bc34af2889d186302291871227ab3cda55fed0d9afdd2db6ef7eec1999be8819.png)
+    - 格式化 IO
+      - 写
+        - ![070dc3edf28f0a9956b5b6c07e30999272dc4b37eec8b42bb3dc4630b2995c48.png](images/070dc3edf28f0a9956b5b6c07e30999272dc4b37eec8b42bb3dc4630b2995c48.png)
+        - 将可变参数列表替换为 arg ![将可变参数列表替换为 arg](images/2e00d4afba233576b459892ac2a9111ec121aad74c38f6e00defb9586ef63150.png)
+      - 读
+        - scanf ![scanf](images/d0712dbb986bd2d99778636e3140653c6189f97efe6ae41211352fce6c813a38.png)
+          - sscanf 用于从指定的 buf 中读取格式化的数据
+  - 定位流
+    - ftell 和 fseek 函数使用长整形变量来存储偏移量；而 ftello 和 fseeko 使用 off_t 类型来存储 ![ftell 和 fseek 函数使用长整形变量来存储偏移量；而 ftello 和 fseeko 使用 off_t 类型来存储](images/4e74786763fc0564befb99dec2f3936a0a86f694dc977068888c51e3b3d3b34f.png)
+      - wence 可以是 SEEK_SET，SEEK_CUR，SEEK_END
+      - ftello 和 fseeko ![ftello 和 fseeko](images/1576514685b28e5b070878691adcc0708321a1f749e0b6c0fbb587fd0547f39f.png)
+    - fgetpos 和 fsetpos 函数使用 fpos_t 来记录文件的位置 ![fgetpos 和 fsetpos 函数使用 fpos_t 来记录文件的位置](images/bea964d28395141cfd370a858597005df44255e8af14cb913adbe7c0d4944534.png)
+      - 需要移植到非UNIX系统上运行的应用程序应当使用fgetpos和fsetpos。
+    - rewind 函数用于将一个流设置到文件的起始位置
+  - 使用 fileno 可以取得文件指针下的文件描述符 ![使用 fileno 可以取得文件指针下的文件描述符](images/3a6ad0e89d56e8da5dd3b2a97e6e0a4eb2759b80aaafa13a8918f170fcabab61.png)
+  - 临时文件 ![临时文件](images/65559848de23f25a0db950ed4c981440d6d193336073525bd80f698fdce3700e.png)
+    - 每次调用 tmpnam 都产生一个不同的路径名，最多的调用次数是 TMP_MAX，定义在 stdio.h 中
+    - 若 ptr = NULL，则产生的路径名存放在一个静态区中，后续调用 tmpname 时，会重写该静态区（这意味着，如果要调用此函数多次，并且想要保存该路径名，则不能保存指针）
+    - 若 ptr != NULL，则认为该指针指向长度至少是 L_tmpnam 个字符的数组，调用函数生成的路径名页存放在该数组中，ptr 也作为返回值返回
+    - tmpfile 创建一个临时二进制文件（类型 wb+），在关闭该文件或程序结束时自动删除这种文件（UNIX 对二进制文件不进行特殊的区分）
+    - mkdtemp 和 mkstemp 函数 ![mkdtemp 和 mkstemp 函数](images/0cab49d6fcf010ea3818d513a4f234a0e7585c361baa79d05e76868639e6ed8a.png)
+      - 名字通过 template 指定的字符串中进行选择
+      - mkdtemp 具有下列默认的权限值： ![mkdtemp 具有下列默认的权限值：](images/98f6967e8b5f21296031eb375aae3c11f2cf39b24ee1db0d23b021f31145801a.png)
+      - mkstemp 具有下列默认权限值： ![mkstemp 具有下列默认权限值：](images/cad17c78ea2ae7590a8f5c1c5fa720ed6130f93f7ce3e11bd89852f88a7c26ab.png)
+      - 如果 template 的后 6 为是 XXXXXX，则这六位是占位符，将用随机的字符串来取代这六位
+  - 内存流
+    - 将缓冲区当做文件来对内存（因为缓冲区位于内存中）进行读写，但是底层（文件系统上）没有真实的文件
+    - 创建内存流
+      - fmemopen ![fmemopen](images/a7c934428d8902f7c58126070d8d45f6df3a20397cb809bfbe139e75731878da.png)
+        - 如果 buf = NULL，则此函数会分配 size 大小的缓冲区，并且在关闭该流时，会释放该缓冲区
+          - 但是这种情况下没有任何意义，因为无法找到缓冲区的地址
+        - type 参数 ![type 参数](images/f50610f92cdfd72cf4aa65fdcdc9431775ea4127beb5042041546e0b006174ed.png)
+        - 无论何时以追加模式打开内存流，都会将文件位置设为缓冲区中的第一个 null 字节，如果不存在 null 字节，就设置为缓冲区的最后一个字节
+        - 任何时候需要增加流缓冲区中的数据量以及调用 fclose、fflush、feek、feeko 以及 fsetpos 时都会在当前位置写入一个 null 字节
+        - fmemopen 函数会在缓冲区开始处放置一个 null 字节
+      - open_memstream 和 openwmemstream ![open_memstream 和 openwmemstream](images/068e251667bd64d987e9c984c7c1ae69619cabb5c8c6a39fbc8cd36f51148daf.png)
+        - 与 fmemopen 的区别
+          - 创建的流只能打开
+          - 不能指定自己的缓冲区，但可以通过 bufp 和 sizep 参数访问缓冲区地址和大小
+          - 关闭流后需要自行释放缓冲区
+          - 对流添加字节会增加缓冲区大小
+        - 在缓冲区地址和大小的使用上必须遵循一些原则
+          - 第一，缓冲区地址和长度只有在调用 fclose 或 fflush 后才有效
+          - 第二，这些值只有在下一次流写入或调用fclose前才有效。因为缓冲区可以增长，可能需要重新分配
+    - 因为避免了缓冲区溢出，内存流非常适用于创建字符串。因为内存流只访问主存，不访问磁盘上的文件，所以对于把标准 IO 流作为参数用于临时文件的函数来说，会有很大的性能提升。
+- 系统数据文件和信息
+  - 口令文件
+    - /etc/passwd
+    - 又称用户数据库
+    - pwd.h 定义的 passwd 结构体中包含了下面的一些字段 ![pwd.h 定义的 passwd 结构体中包含了下面的一些字段](images/3bb9555dcd63ce0373d7c963ed0b0c1bba1f76512e38db854c2fd47c242204f8.png)
+      - 加密口令字段是一个占位符
+    - 口令文件中的某些字段可能是空的
+    - 为了阻止某个用户登录系统，可以采取：
+      - 将登录 shell 字段设置为 /dev/null 或 /dev/false、/usr/sbin/nologin、/bin/true
+    - nobody 用户名的目的是：是任何人都可以登录至系统，只能访问人人皆可读、写的文件
+    - 获取口令文件项
+      - 获取指定用户的 ![获取指定用户的](images/b1019292da24d2dde97dd07c18ffbf9f1fdcba9e276d7153d7c00f4e3d68cbb2.png)
+        - 返回的结构体是函数内部的静态变量，只要调用任一相关函数，其内容就会被重写
+      - 查看整个口令文件 ![查看整个口令文件](images/54efe5e94fc7827292918641beb781a3d21a3cf5af09284e6716df9068c96ef0.png)
+        - 调用 getpwent 时，返回口令文件中的下一个记录项，同样返回的结构体也是函数内部的一个静态变量
+        - setpwent 将口令文件的文件偏移量设置为 0
+        - endpwent 用于关闭 getpwent 打开的文件资源。一定要调用此函数来关闭 getpwent 打开的文件
+  - 阴影口令（shadow password）
+    - 用户口令通过单向的加密算法加密后存储到此文件中
+    - /etc/shadow 文件中的字段 ![/etc/shadow 文件中的字段](images/7814e01c9070edc4b8252c69146476870c71eb340ace8daccfb5dc86ffaebac0.png)
+    - 只有少数的几个程序（login、passwd）可以访问（拥有 root 权限）
+  - 组文件
+    - /etc/group 文件中的字段 ![/etc/group 文件中的字段](images/99504a657507b1b08adb6a8cf00df5a723bcd1e2801a60712aca262d2a53eda0.png)
+    - 字段包含在 &lt;grp.h&gt; 中的 struct group 中
+    - 查看的单个组的字段 ![查看的单个组的字段](images/05bb07172a29a63a685ddd192133fcb0771f06bb80d1c9cbc34ba9684c911077.png)
+    - 查看所有组的字段 ![查看所有组的字段](images/5d11de5301285427aeeff9f2195401b6a398626340e314a77fcc552c3c156fa9.png)
+  - 附属组
+    - 一个用户可以不仅归属于一个组，可以归属的组的最大数量为 NGROUPS_MAX
+    - 获取和设置附属组 ID ![获取和设置附属组 ID](images/095dbc617941daf9a1fca2143cd8b3e335f16c25003d32d68694fc0e42d3e677.png)
+      - setgroups 只能为调用进程设置附属组
+      - initgroups 用来为调用进程设置主组（basegid）和附属组的相关信息。其中，附属组是 username 所有的附属组
+  - 登录的账户记录
+    - utmp 文件记录当前登录到系统的各个用户
+      - 在 /var/run/utmp 文件中
+    - wtmp 文件跟踪各个登录和注销事件
+      - 在 /var/log/wtmp 文件中
+  - 系统标识
+    - uname 函数返回主机和操作系统有关的信息 ![uname 函数返回主机和操作系统有关的信息](images/1c94a3a93c7d7ebf67ec8bf8761c090a20c984a67270d8336e2dbae732af7ede.png)
+      - uname 函数负责填写 utsname 结构体
+      - utsname 结构体 ![utsname 结构体](images/d571d468cfa4cb0cba06066e1b834fcc20ff28bec4dab81b7fe10af592d5bbb1.png)
+  - 时间和日期
+    - time 函数返回当前时间和日期 ![time 函数返回当前时间和日期](images/c0fe0421605a2aa502456d3a84e917b58e443006d6a0d5b374ea3cc84c4b033f.png)
+      - 时间值作为返回值返回，如果参数非空，也会存放在 calptr 指向的结构体中
+    - 获取指定时钟的时间 ![获取指定时钟的时间](images/6966264e09086a919dd632c3e31064320a96ad2af4f612e2c5ab3fd15cca109c.png)
+      - 起重工，clock_id 的值可能为： ![起重工，clock_id 的值可能为：](images/9991107602fc5bc2847b173d84578c1d19389e19bfd03171ad264359257059df.png)
+    - clock_getres 函数吧参数 tsp 指向的 timespec 结构初始化为与 clock_id 参数对应的时钟精度 ![clock_getres 函数吧参数 tsp 指向的 timespec 结构初始化为与 clock_id 参数对应的时钟精度](images/7a9b18b29a089c17e7c97faee985a750ca01495b85e23eca91d321d9210cf61b.png)
+      - 例如，如果精度为1毫秒，则tv_sec字段就是0，tv_nsec字段就是1000000。
+    - 对特定的时钟设置时间 ![对特定的时钟设置时间](images/eb2cadc8a8add90b64f685fe2b1e1eb56574a0a3c5f939af0be67ce500528a6c.png)
+    - gettimeofday 已弃用，但是其可以达到微妙级的精度 ![gettimeofday 已弃用，但是其可以达到微妙级的精度](images/5842f50d2dcd789e1ba014ffabcdc95bfd9112af8908b51c2798f86e1aa199cb.png)
+      - tzp 的唯一合法值是 NULL，某些平台使用其来说明时区
+    - localtime 和 gmtime 将日历时间转化成分解的时间，并将这些存放在一个 tm 结构体中 ![localtime 和 gmtime 将日历时间转化成分解的时间，并将这些存放在一个 tm 结构体中](images/ba5e3129866396dd73fb4a2f142c50f1b2acc1d5d04c5132646df0da6ce8cd3a.png)
+      - tm 结构体 ![tm 结构体](images/aa6ae26992c675ad09aa8407772c8ab6e6c7ee8db0ad55053011aa7391868cd7.png)
+        - 秒可以超过 59 是因为可能润秒
+      - localtime 和 gmtime 之间的区别是：1ocaltime 将日历时间转换成本地时间（考虑到本地时区和夏令时标志），而gmtime则将日历时间转换成协调统一时间的年、月、日、时、分、秒、周日分解结构。
+    - mktime 以本地时间的年、月、日等作为参数，将其变换成 time_t 值 ![mktime 以本地时间的年、月、日等作为参数，将其变换成 time_t 值](images/83536997d82689408830ca6c12611a41b797810b64a9c49d7e2472aaa84c6393.png)
+    - strftime 用来格式化输出时间 ![strftime 用来格式化输出时间](images/ee2be26df69f4b6a885c474b4ac70568ddeb24e7e0904fdf6b17f8a8b0f6f4d2.png)
+      - strftime_l 允许调用者将区域指定为参数；strftime 使用 TZ 环境变量指定的区域
+      - format 参数类似于 printf 函数，但是其占位符有特殊的定义 ![format 参数类似于 printf 函数，但是其占位符有特殊的定义](images/ed8bfabf598c8423580f5d8d8e828563acbea73613691ed1e66edca6f57126c9.png)
+    - strptime 用来将格式化字符串转换为 tm 结构体 ![strptime 用来将格式化字符串转换为 tm 结构体](images/2f2706e86c7204731dd18d96ca9bf50279f0c5c167da45ce63a89562284539eb.png)
+      - format 参数 ![format 参数](images/55d5368451ee681ed6958d0040e811a858f45a7d605bbe7febdd338e5c57a790.png)
+    - 各个时间函数之间的关系，虚线表示的是该函数受到环境变量 TZ 的影响 ![各个时间函数之间的关系，虚线表示的是该函数受到环境变量 TZ 的影响](images/461fe8b629c080d4ea3262ed88b06062fcfa81e1ebd4d8ce8e69d68b7b00154f.png)
+```

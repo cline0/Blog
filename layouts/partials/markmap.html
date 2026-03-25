@@ -1,0 +1,79 @@
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/markmap-toolbar@0.18.12/dist/style.css">
+
+<script>
+  window.markmap = window.markmap || {};
+  window.markmap.autoLoader = Object.assign(
+    {},
+    window.markmap.autoLoader || {},
+    { manual: true }
+  );
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/markmap-autoloader@0.18.12"></script>
+<script>
+  (function () {
+    function convertMarkmapBlocks() {
+      var codeBlocks = document.querySelectorAll('pre > code.language-markmap');
+      codeBlocks.forEach(function (code) {
+        var pre = code.parentElement;
+        if (!pre || pre.dataset.markmap === 'converted') return;
+        var wrapper = document.createElement('div');
+        wrapper.className = 'markmap';
+        wrapper.textContent = code.textContent || '';
+        pre.dataset.markmap = 'converted';
+        pre.replaceWith(wrapper);
+      });
+    }
+
+    function renderMarkmaps() {
+      if (window.markmap &&
+          window.markmap.autoLoader &&
+          typeof window.markmap.autoLoader.renderAll === 'function') {
+        window.markmap.autoLoader.renderAll();
+      } else {
+        window.requestAnimationFrame(renderMarkmaps);
+      }
+    }
+
+    function initMarkmap() {
+      convertMarkmapBlocks();
+      renderMarkmaps();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initMarkmap);
+    } else {
+      initMarkmap();
+    }
+  })();
+</script>
+
+<style>
+pre > code.language-markmap {
+  display: none;
+}
+.markmap {
+  min-height: var(--markmap-min-height, 420px);
+}
+.markmap svg.markmap {
+  min-height: inherit;
+  width: 100%;
+  height: 100%;
+}
+.markmap img {
+  max-width: 420px;
+  max-height: 280px;
+  width: auto;
+  height: auto;
+}
+svg.markmap text {
+  fill: var(--body-font-color, #e9ecef);
+}
+svg.markmap foreignObject,
+svg.markmap foreignObject div {
+  color: var(--body-font-color, #e9ecef) !important;
+  fill: var(--body-font-color, #e9ecef) !important;
+}
+svg.markmap .markmap-foreign {
+  color: var(--body-font-color, #e9ecef) !important;
+}
+</style>

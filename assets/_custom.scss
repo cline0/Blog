@@ -1,0 +1,78 @@
+p > img {
+  background-color: #ffffff
+}
+li > img {
+  background-color: #ffffff
+}
+$heading-colors: (
+  h1: #82aaff, // 蓝
+  h2: #86e1fc, // 青
+  h3: #c3e88d, // 绿
+  h4: #ffc777, // 黄
+  h5: #ff966c, // 橙
+  h6: #c099ff  // 紫
+);
+
+$heading-icons: (
+  h1: "h1.svg",
+  h2: "h2.svg",
+  h3: "h3.svg",
+  h4: "h4.svg",
+  h5: "h5.svg",
+  h6: "h6.svg"
+);
+
+// 3️⃣ 循环生成规则
+.book-page {
+  @each $level, $color in $heading-colors {
+    #{$level}::before {
+      content: "";
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+
+      background-color: $color;
+
+      -webkit-mask: url("/icons/#{map-get($heading-icons, $level)}") no-repeat center;
+      mask: url("/icons/#{map-get($heading-icons, $level)}") no-repeat center;
+
+      -webkit-mask-size: contain;
+      mask-size: contain;
+    }
+  }
+}
+
+:root {
+  --markmap-min-height: clamp(600px, calc(100vh - 220px), 1200px);
+}
+
+.container {
+  max-width: 110rem;
+  width: 100%;
+  padding-inline: 1rem;
+  box-sizing: border-box;
+}
+
+.book-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.book-page > .markdown.book-article {
+  flex: 1 0 auto;
+}
+
+.book-page > .markdown.book-article > .markmap {
+  flex: 1 1 auto;
+  display: flex;
+}
+
+.book-page > .markdown.book-article > .markmap svg.markmap {
+  height: 100%;
+}
+
+.book-footer {
+  margin-top: $padding-16 * 2;
+}

@@ -1,0 +1,15 @@
+baseURL = 'https://example.org/'
+languageCode = 'zh_cn'
+title = "Cline's Blog"
+theme = "hugo-book"
+
+[markup]
+[markup.goldmark.renderer]
+unsafe = true
+[markup.highlight]
+style = "catppuccin-macchiato"
+lineNos = true
+
+[params]
+BookTheme = "dark"
+BookCollapseSection = true

@@ -1,0 +1,42 @@
+# ------------------------------
+# Hugo build artifacts
+# ------------------------------
+public/
+resources/_gen/
+.hugo_build.lock
+hugo_stats.json
+
+# ------------------------------
+# Local drafts (keep source repo clean)
+# ------------------------------
+content/draft/
+
+# ------------------------------
+# Python (xmind2md.py and local tooling)
+# ------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# ------------------------------
+# Editor / OS noise
+# ------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ------------------------------
+# Logs and temp files
+# ------------------------------
+*.log
+*.tmp
