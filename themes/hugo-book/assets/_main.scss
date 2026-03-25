@@ -423,9 +423,12 @@ body[dir="rtl"] .book-menu {
 
 // Extra space for big screens
 @media screen and (min-width: $container-max-width) {
-  .book-page,
-  .book-menu .book-menu-content,
+  main {
+    gap: $padding-16;
+    padding: $padding-16;
+  }
+  .book-menu .book-menu-content, // move fixed menus down
   .book-toc .book-toc-content {
-    padding: $padding-16 * 2 $padding-16;
+    top: $padding-16;
   }
 }

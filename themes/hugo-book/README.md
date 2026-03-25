@@ -129,7 +129,7 @@ disableKinds = ['taxonomy', 'taxonomyTerm']
 
 [params]
   # (Optional, default light) Sets color theme: light, dark or auto.
-  # Theme 'auto' switches between dark and light modes based on browser/os preferences
+  # Theme 'auto' switches between dark and light modes based on browser/os preferences. With plugins/themes added there are more themes.
   BookTheme = 'light'
 
   # (Optional, default true) Controls table of contents visibility on right side of pages.
@@ -265,6 +265,7 @@ There are a few features implemented as pluggable `scss` styles. Usually these a
 | --------------------------------- | ----------------------------------------------------------- |
 | `assets/plugins/_numbered.scss`   | Makes headings in markdown numbered, e.g. `1.1`, `1.2`      |
 | `assets/plugins/_scrollbars.scss` | Overrides scrollbar styles to look similar across platforms |
+| `assets/plugins/_themes.scss`     | Experimental: Extra color themes                            |
 
 To enable plugins, add `@import "plugins/{name}";` to `assets/_custom.scss` in your website root.
 

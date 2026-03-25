@@ -1,8 +1,5 @@
 # Asciinema
 
-> [!WARNING]
-> Experimental, could change in the future or be removed
-
 Asciinema shortcode integrates asciinema player into the markdown page.
 
 ```tpl
